@@ -7,6 +7,8 @@ class CDPlayer():
         self.initialise_player()
         self.initialise_events()
         self.track = 0
+        self.track_length = 0
+        self.state = 'stopped'
 
     def initialise_player(self):
         self.instance = vlc.Instance()
@@ -27,36 +29,61 @@ class CDPlayer():
 
     def player_opening(self, event):
         print('Opening...')
+        self.state = 'opening'
     def player_playing(self, event):
         print('Playing...')
+        self.state = 'playing'
     def player_paused(self, event):
         print('Paused')
+        self.state = 'paused'
     def player_stopped(self, event):
         print('Stopped')
+        self.state = 'stopped'
     def player_end_reached(self, event):
         print('End reached')
-    def list_player_track_changed(self, event):
         self.track += 1
+    def list_player_track_changed(self, event):
         print(f'Track: {self.track}')
-    """
-        def list_end_reached(self, event):
-        print('List end reached')
-    """
+        self.track_length = self.get_track_length()
+        print(self.track_length)
+        
+    def get_track_length(self):
+        if self.state == 'playing':
+            time.sleep(1)
+            total = self.get_current_time() / self.get_current_position()
+            return total
+    def get_current_time(self):
+        return self.player.get_time() / 1000
+    def get_current_position(self):
+        return self.player.get_position()
 
     def play_pause(self):
-        if self.listplayer.is_playing():
+        if self.player.is_playing():
             self.listplayer.pause()
         else:
             self.listplayer.play()
     def next_track(self):
+        if not self.state == 'playing':
+            print('start')
+            self.play_pause()
         self.listplayer.next()
+        self.track += 1
     def prev_track(self):
+        if not self.state == 'playing':
+            self.play_pause()
         self.listplayer.previous()
+        self.track -= 1
     def stop(self):
         self.listplayer.stop()
 
 cd = CDPlayer()
+cd.play_pause()
 while True:
+    print(f'Track {cd.track}: {cd.get_current_time()} / {cd.track_length} ({cd.get_current_position() * 100}%)', end='\r')
+    time.sleep(1)
+"""
+while True:
+    print(cd.player.get_state())
     if input() == 'p':
         cd.play_pause()
     elif input() == 'n':
@@ -65,21 +92,4 @@ while True:
         cd.prev_track()
     elif input() == 's':
         cd.stop()
-"""
-cd.listplayer.next()
-for i in range(22):
-    while cd.listplayer.get_state() == vlc.State._enum_names_[1]:
-        print('opening')
-        time.sleep(0.5)
-    for i in range(25):
-        print(f'{i}: {cd.listplayer.get_state()}')
-        time.sleep(0.5)
-    cd.listplayer.next()
-"""
-
-"""
-print(cd.player.get_time())
-cd.listplayer.next()
-time.sleep(10)
-print(cd.player.get_position())
 """
