@@ -5,6 +5,21 @@ import cdio
 import time
 import re
 
+class Drive():
+    def __init__(self):
+            self.drive = cdio.Device(source='/dev/sr1', driver_id=pycdio.DRIVER_UNKNOWN)
+            self.state = self.check_disc() # state is either 'disc' or 'nodisc'
+    def check_disc(self):
+        try:
+            self.drive.get_num_tracks()
+            self.state = 'disc'
+        except:
+            self.state = 'nodisc'
+        return self.state
+    def eject(self):
+        self.drive.eject_media()
+        self.state = 'nodisc'
+
 class CDPlayer():
     def __init__(self):
         # vlc
@@ -13,7 +28,6 @@ class CDPlayer():
 
         # pycdio
         self.drive = cdio.Device(source='/dev/sr1', driver_id=pycdio.DRIVER_UNKNOWN)
-
         self.total_tracks_len = self.get_total_tracks()
         self.total_tracks_num = len(self.total_tracks_len)
         self.track = 0
@@ -108,7 +122,7 @@ class CDPlayer():
             self.track -= 1
         else:
             self.track = self.total_tracks_num
-    def seek_pressed(self, direction):
+    def seek_pressed(self, direction): # this function should be run repeatedly for effect
         if self.track != 0: # no seeking within opening track
             if direction == 'forward':
                 k = 1 # forward
@@ -121,42 +135,3 @@ class CDPlayer():
     def stop(self):
         self.listplayer.stop()
         self.track = 0 # reset track count when stop playing
-    """
-    KEEP! But move to controller class?
-    def eject(self):
-        self.stop()
-        while self.state != 'stopped':
-            print(self.state)
-            time.sleep(0.25)
-        self.drive.eject_media()
-    """
-
-cd = CDPlayer()
-cd.play_pause()
-time.sleep(20)
-print(cd.get_current_position())
-start = time.perf_counter()
-while time.perf_counter() - start < 5:
-    cd.seek_pressed('forward')
-print(cd.get_current_position())
-time.sleep(10)
-"""
-while True:
-    print(f'Track {cd.track}: {cd.get_current_time()} / {cd.track_length} ({cd.get_current_position() * 100}%)', end='\r')
-    time.sleep(1)
-"""
-"""
-while True:
-    print(cd.player.get_state())
-    if input() == 'p':
-        cd.play_pause()
-    elif input() == 'n':
-        cd.next_track()
-    elif input() == 'b':
-        cd.prev_track()
-    elif input() == 's':
-        cd.stop()
-    elif input() == 'e':
-        cd.eject()
-    time.sleep(0.5)
-"""
