@@ -51,11 +51,6 @@ class Preset():
         self.num = num
         self.selected = selected
 
-class PresetNotSet(Exception):
-    def __init__(self, message='PresetNotSet: There is no preset set for the specified index'):
-        self.message = message
-        super().__init__(message)
-
 class Radio():
     def __init__(self):
         self.instance = vlc.Instance()
@@ -71,7 +66,7 @@ class Radio():
         return list
     def start(self, preset):
         if self.presets[preset] == None:
-            raise PresetNotSet
+            raise PresetNotSet # this doesn't work because exception class moved to controller.py
         else:
             self.current = preset
             self.player.set_media(self.presets[preset])

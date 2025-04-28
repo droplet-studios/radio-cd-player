@@ -96,9 +96,11 @@ class CDPlayer():
     #        total = self.get_current_time() / self.get_current_position()
     #        return total
     def get_current_time(self):
-        return self.player.get_time() / 1000
+        cur_time = int(self.player.get_time() / 1000) # round to nearest second
+        return cur_time
     def get_current_position(self):
-        return self.player.get_position()
+        cur_pos = int(self.player.get_position() * 100) # round to nearest 0.01
+        return cur_pos
 
     def play_pause(self):
         if self.player.is_playing():

@@ -6,6 +6,16 @@ import sys
 import threading
 import time
 
+class PresetNotSet(Exception):
+    def __init__(self, message='PresetNotSet: There is no preset set for the specified index'):
+        self.message = message
+        super().__init__(message)
+
+class NoDisc(Exception):
+    def __init__(self, message='NoDisc: There is no disc in the drive'):
+        self.message = message
+        super().__init__(message)
+
 class Controller():
     def __init__(self):
         self.mode = 'off'
@@ -14,6 +24,9 @@ class Controller():
         self.drive = cd.Drive()
         self.view = view.View()
         
+        self.special = ''
+        self.special_msg_timeout = 3
+
     # each function corresponds to physical button
     def start_radio(self): # switched mode to radio
         if self.mode != 'radio':
@@ -21,11 +34,12 @@ class Controller():
                 self.cd.stop()
             except:
                 print('No CD player instance to stop; continuing...')
-            self.mode = 'radio'
             try:
                 self.radio.start(self.radio_config.last_station)
-            except radio.PresetNotSet:
+                self.mode = 'radio'
+            except PresetNotSet:
                 print('Preset not set')
+                self.special = 'Preset not set'
 
     # how to generate functions without writing same thing?
     def preset_one(self):
@@ -34,16 +48,19 @@ class Controller():
             self.radio_config.set_last_station(0)
             try:
                 self.radio.start(0)
-            except radio.PresetNotSet:
+            except PresetNotSet:
                 print('Preset not set')
+                self.special = 'Preset not set'
 
     def play_pause(self): # switches mode to cd
         if self.mode != 'cd':
             self.radio.stop()
-            self.mode = 'cd'
             if self.drive.check_disc() == 'disc':
                 self.cd = cd.CDPlayer()
+                self.mode = 'cd'
                 self.cd.play_pause()
+            else:
+                self.special = 'No disc'
         else: # mode is 'cd' only when a disc is already playing
             self.cd.play_pause()
 
@@ -78,6 +95,7 @@ class Controller():
             self.stop()
             self.mode = 'off'
         self.drive.eject()
+        self.special = 'Disc ejected'
 
     def controls(self): # replace with real button bindings
         while True:
@@ -105,24 +123,38 @@ class Controller():
 
     def update_view(self):
         while True:
-            if self.mode == 'off':
+            self.view.label0.destroy()
+            self.view.label1.destroy()
+
+            self.view.current_state(self.mode)
+
+            if self.special != '':
+                if self.special_msg_timeout > 0:
+                    self.view.special(self.special)
+                    self.special_msg_timeout -= 1
+                else:
+                    self.special = ''
+                    self.special_msg_timeout = 3
+            elif self.mode == 'off':
                 self.view.stopped()
             elif self.mode == 'radio':
                 cur = self.radio.current
                 self.view.radio(self.radio.presets[cur].name)
             elif self.mode == 'cd':
-                time = self.cd.get_current_time()
+                cur_time = self.cd.get_current_time()
                 pos = self.cd.get_current_position()
                 track = self.cd.track
                 tot = self.cd.total_tracks_num
-                self.view.cd(time, pos, track, tot)
+                self.view.cd(cur_time, pos, track, tot)
             time.sleep(1)
 
-# use multithreading to run controls() and update_view() concurrently?
+# use multithreading to run controls() and update_view() concurrently
+# this might not be necessary if gpiozero functions are non-blocking
 if __name__ == '__main__':
     cont = Controller()
-    controls = threading.Thread(cont.controls)
-    upd_view = threading.Thread(cont.update_view)
+    controls = threading.Thread(target=cont.controls)
+    upd_view = threading.Thread(target=cont.update_view)
     threads = [controls, upd_view]
     for thread in threads:
         thread.start()
+    cont.view.root.mainloop()
