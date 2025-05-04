@@ -1,32 +1,47 @@
-import radio
 import cd
+import radio
 import view
 
-import sys
-import threading
-import time
+from enum import Enum
+import datetime
 
-class PresetNotSet(Exception):
-    def __init__(self, message='PresetNotSet: There is no preset set for the specified index'):
-        self.message = message
-        super().__init__(message)
+class Mode(Enum):
+    OFF = 0
+    RADIO = 1
+    CD = 2
 
-class NoDisc(Exception):
-    def __init__(self, message='NoDisc: There is no disc in the drive'):
-        self.message = message
-        super().__init__(message)
+class Events(Enum):
+    VOL = 0
+
+class Logger():
+    def log(self, event):
+        with open('log.txt', 'a') as logfile:
+            logfile.write(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {event}\n')
 
 class Controller():
     def __init__(self):
-        self.mode = 'off'
-        self.radio = radio.Radio() # only need one instance of radio
-        self.radio_config = radio.Config(self.radio)
-        self.drive = cd.Drive()
-        self.view = view.View()
-        
-        self.special = ''
-        self.special_msg_timeout = 3
+        self.cd_player = cd.CDPlayer()
+        self.radio = radio.Radio()
+        self.view = view.View(cd.Status, cd.Events, radio.Status, radio.Events)
 
+        self.logger = Logger()
+
+        self.cd_player.attach(self)
+        self.radio.attach(self)
+        self.device.attach(self)
+
+        self.mode = Mode.OFF
+
+    def update(self, event):
+        if event is cd.Events.STOPPED:
+            self.mode = Mode.OFF
+            # stopped event doesn't need to be sent to view (because just changes mode to off)
+        elif event is cd.Events.EJECT:
+            self.mode = Mode.OFF
+            self.view.on_event(event) # send event to view
+        #self.logger.log()
+        
+    """
     # each function corresponds to physical button
     def start_radio(self): # switched mode to radio
         if self.mode != 'radio':
@@ -51,110 +66,65 @@ class Controller():
             except PresetNotSet:
                 print('Preset not set')
                 self.special = 'Preset not set'
-
+    """
     def play_pause(self): # switches mode to cd
-        if self.mode != 'cd':
+        if self.mode is not Mode.CD:
             self.radio.stop()
-            if self.drive.check_disc() == 'disc':
-                self.cd = cd.CDPlayer()
-                self.mode = 'cd'
-                self.cd.play_pause()
-            else:
-                self.special = 'No disc'
-        else: # mode is 'cd' only when a disc is already playing
-            self.cd.play_pause()
+            self.mode = Mode.CD
+        self.cd_player.play_pause()
 
     def skip_forward(self):
-        if self.mode == 'cd':
-            self.cd.next_track()
+        if self.mode is Mode.CD:
+            self.cd_player.next_track()
 
     def skip_backwards(self):
-        if self.mode == 'cd':
-            self.cd.prev_track()
+        if self.mode is Mode.CD:
+            self.cd_player.prev_track()
 
     # change later to not have built-in loop
     def fast_forward(self):
-        if self.mode == 'cd':
+        if self.mode is Mode.CD:
             for i in range(1000):
-                self.cd.seek_pressed(1)
+                self.cd_player.seek_pressed(1)
     
     def rewind(self):
-        if self.mode == 'cd':
+        if self.mode is Mode.CD:
             for i in range(1000):
-                self.cd.seek_pressed(-1)
+                self.cd_player.seek_pressed(-1)
     
     def stop(self):
-        if self.mode == 'radio':
+        if self.mode is Mode.RADIO:
             self.radio.stop()
-        elif self.mode == 'cd':
-            self.cd.stop()
-        self.mode = 'off'
+        elif self.mode is Mode.CD:
+            self.cd_player.stop()
+        self.mode = Mode.OFF
 
     def eject(self):
-        if self.mode == 'cd':
-            self.stop()
-            self.mode = 'off'
-        self.drive.eject()
-        self.special = 'Disc ejected'
-
-    def controls(self): # replace with real button bindings
-        while True:
-            res = input()
-            if res == 'r':
-                self.start_radio()
-            elif res == 'p1':
-                self.preset_one()
-            elif res == 'p':
-                self.play_pause()
-            elif res == 'n':
-                self.skip_forward()
-            elif res == 'b':
-                self.skip_backwards()
-            elif res == 'ff':
-                self.fast_forward()
-            elif res == 'rw':
-                self.rewind()
-            elif res == 's':
-                self.stop()
-            elif res == 'e':
-                self.eject()
-            elif res == 'q':
-                sys.exit()
+        if self.mode is Mode.CD:
+            self.mode = Mode.OFF
+        self.cd_player.eject()
 
     def update_view(self):
         while True:
-            self.view.label0.destroy()
-            self.view.label1.destroy()
+            if self.mode is Mode.OFF:
+                self.view.off()
+            elif self.mode is Mode.CD:
+                state = self.cd_player.state
+                time = self.format_time(self.cd_player.get_current_time())
+                tot_time = self.format_time(self.cd_player.get_current_len())
+                track = self.cd_player.cur_track
+                tot_track = self.cd_player.cd.total_tracks_num
+                self.view.cd(state, time, tot_time, track, tot_track)
+            elif self.mode is Mode.RADIO:
+                pass
 
-            self.view.current_state(self.mode)
-
-            if self.special != '':
-                if self.special_msg_timeout > 0:
-                    self.view.special(self.special)
-                    self.special_msg_timeout -= 1
-                else:
-                    self.special = ''
-                    self.special_msg_timeout = 3
-            elif self.mode == 'off':
-                self.view.stopped()
-            elif self.mode == 'radio':
-                cur = self.radio.current
-                self.view.radio(self.radio.presets[cur].name)
-            elif self.mode == 'cd':
-                cur_time = self.cd.get_current_time()
-                pos = self.cd.get_current_position()
-                track = self.cd.track
-                tot = self.cd.total_tracks_num
-                self.view.cd(cur_time, pos, track, tot)
-            time.sleep(1)
-
-# use multithreading to run controls() and update_view() concurrently
-# this might not be necessary if gpiozero functions are non-blocking
+    def format_time(self, time): # move to controller?
+        """
+        Formats time given in seconds to mm:ss format
+        """
+        minutes = int(time // 60)
+        seconds = int(time - (minutes * 60))
+        res = f'{minutes}:{seconds}'
+        return res
 if __name__ == '__main__':
-    cont = Controller()
-    controls = threading.Thread(target=cont.controls)
-    upd_view = threading.Thread(target=cont.update_view)
-    threads = [controls, upd_view]
-    for thread in threads:
-        thread.start()
-    cont.view.root.mainloop()
+    controller = Controller()
