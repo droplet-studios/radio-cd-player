@@ -21,7 +21,7 @@ class View():
         line_2 = datetime.datetime.now().strftime("%H:%M:%S")
         self.make_final_view(line_1, line_2)
 
-    def cd(self, state, time, tot_time, track, tot_track):
+    def cd(self, state, time=0, tot_time=0, track=0, tot_track=0):
         line_1 = 'CD' # first line always includes this
 
         # set special icons to display
@@ -38,6 +38,8 @@ class View():
             line_2 = 'No disc'
         elif state is self.cd_status.NO_DRIVE:
             line_2 = 'No drive'
+        elif state is self.cd_status.OPENING:
+            line_2 = 'Opening...'
         elif state is self.cd_status.STOPPED:
             line_2 = '' # no status message to display when stopped
         else:
@@ -58,7 +60,7 @@ class View():
     
     def make_final_view(self, line_1, line_2):
         if self.event is not None:
-            if time.perf_counter < self.event_start + self.MAX_EVENT_LEN:
+            if time.perf_counter() < self.event_start + self.MAX_EVENT_LEN:
                 if self.event is self.cd_event.EJECT:
                     line_2 = 'Disc ejected'
                 elif self.event is self.radio_event.NO_PRESET:
@@ -68,5 +70,5 @@ class View():
             else:
                 self.event = None
         res = f'{line_1}\n{line_2}'
-        print(res, end='\r')
+        print(res)
         return res

@@ -12,9 +12,6 @@ class Events(Enum):
 
 class Radio():
     def __init__(self):
-        self.status = Status()
-        self.events = Events()
-
         self.observers = []
 
         self.state = Status.STOPPED
@@ -25,5 +22,5 @@ class Radio():
         for observer in self.observers:
             observer.update(event)
 
-    def stop():
+    def stop(self):
         pass

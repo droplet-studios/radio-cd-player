@@ -4,6 +4,9 @@ import view
 
 from enum import Enum
 import datetime
+import time
+import sys
+import threading
 
 class Mode(Enum):
     OFF = 0
@@ -28,7 +31,6 @@ class Controller():
 
         self.cd_player.attach(self)
         self.radio.attach(self)
-        self.device.attach(self)
 
         self.mode = Mode.OFF
 
@@ -110,21 +112,57 @@ class Controller():
                 self.view.off()
             elif self.mode is Mode.CD:
                 state = self.cd_player.state
-                time = self.format_time(self.cd_player.get_current_time())
-                tot_time = self.format_time(self.cd_player.get_current_len())
-                track = self.cd_player.cur_track
-                tot_track = self.cd_player.cd.total_tracks_num
-                self.view.cd(state, time, tot_time, track, tot_track)
+                if self.cd_player.state is not cd.Status.NO_DISC and self.cd_player.state is not cd.Status.NO_DRIVE:
+                    cur_time = self.format_time(self.cd_player.get_current_time())
+                    tot_time = self.format_time(self.cd_player.get_current_len())
+                    track = self.cd_player.cur_track
+                    tot_track = self.cd_player.cd.total_tracks_num
+                    self.view.cd(state, cur_time, tot_time, track, tot_track)
+                else:
+                    self.view.cd(state) # when no disc or no drive, then other variables don't exist because disc not initialised
             elif self.mode is Mode.RADIO:
                 pass
-
+            time.sleep(1)
     def format_time(self, time): # move to controller?
         """
         Formats time given in seconds to mm:ss format
         """
         minutes = int(time // 60)
         seconds = int(time - (minutes * 60))
+        minutes = str(minutes)
+        seconds = str(seconds)
+        if len(minutes) == 1:
+            minutes = '0' + minutes # for single digit case, add placeholder zero
+        if len(seconds) == 1:
+            seconds = '0' + seconds
         res = f'{minutes}:{seconds}'
         return res
+    
+    def controls(self):
+        while True:
+            res = input()
+            if res == 'p':
+                controller.play_pause()
+            elif res == 'n':
+                controller.skip_forward()
+            elif res == 'b':
+                controller.skip_backwards()
+            elif res == 'ff':
+                controller.fast_forward()
+            elif res == 'rw':
+                controller.rewind()
+            elif res == 's':
+                controller.stop()
+            elif res == 'e':
+                controller.eject()
+
 if __name__ == '__main__':
     controller = Controller()
+    controls = threading.Thread(target=controller.controls)
+    upd_view = threading.Thread(target=controller.update_view)
+ 
+    threads = [controls, upd_view]
+ 
+    for thread in threads:
+        thread.start()
+    

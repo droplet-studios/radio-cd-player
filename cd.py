@@ -5,16 +5,17 @@ import re
 from enum import Enum
 import sys
 
-DRIVE_PATH = '/dev/rdisk4'
+DRIVE_PATH = '/dev/sr1'
 
 class Status(Enum):
     NO_DRIVE = -2
     NO_DISC = -1
     STOPPED = 0
-    PLAYING = 1
-    PAUSED = 2
-    FAST_FORWARD = 3
-    REWIND = 4
+    OPENING = 1
+    PLAYING = 2
+    PAUSED = 3
+    FAST_FORWARD = 4
+    REWIND = 5
 
 class Events(Enum):
     STOPPED = 0
@@ -24,14 +25,14 @@ class CD():
     def __init__(self, drive):
         self.drive = drive
         self.total_tracks_len = self.get_total_tracks()
-        self.total_tracks_num = len(self.total_tracks_len)
+        self.total_tracks_num = len(self.total_tracks_len) - 1
 
     def get_total_tracks(self):
         track_num = self.drive.get_num_tracks() # get total number of tracks
         track_msf = []
         for i in range(1, track_num+2):
             track_msf.append(self.drive.get_track(i).get_msf()) # get min, sec, frames of each track
-        track_len = []
+        track_len = [0] # include placeholder for opening track 0
         # because each msf is a string, separate out to calculate integer seconds
         for i in range(len(track_msf) - 1):
             len_current = re.split(r':', track_msf[i])
@@ -87,14 +88,21 @@ class CDPlayer():
         self.medialist.add_media('cdda://' + DRIVE_PATH)
         self.listplayer.set_media_list(self.medialist)
         self.player.event_manager().event_attach(vlc.EventType.MediaPlayerEndReached, self.player_end_reached)
-
+        self.player.event_manager().event_attach(vlc.EventType.MediaPlayerOpening, self.player_opening)
+        self.player.event_manager().event_attach(vlc.EventType.MediaPlayerPlaying, self.player_playing)
     def player_end_reached(self, event):
+        print(self.cur_track, self.cd.total_tracks_num)
         if self.cur_track < self.cd.total_tracks_num:
             self.cur_track += 1
         else:
-            self.stop() # stop playback when end reached
+            # vlc already stops playback when end reached, so unnecessary to call stop() again
             self.state = Status.STOPPED
             self.notify(Events.STOPPED)
+            self.cur_track = 0
+    def player_opening(self, event):
+        self.state = Status.OPENING
+    def player_playing(self, event):
+        self.state = Status.PLAYING
 
     def get_current_time(self):
         """
@@ -106,7 +114,7 @@ class CDPlayer():
         """
         Calculates the total length of the current track
         """
-        return self.cd.total_tracks_len[self.cur_track - 1]
+        return self.cd.total_tracks_len[self.cur_track]
     def get_current_position(self):
         """
         Calculates the current position, as a percentage
@@ -116,6 +124,7 @@ class CDPlayer():
     
     def play_pause(self):
         if self.state is Status.NO_DISC:
+            self.init_drive() # cdio requires reinitialisation after disc change
             self.check_disc()
         if self.state is Status.PLAYING:
             self.state = Status.PAUSED
@@ -140,7 +149,8 @@ class CDPlayer():
             if self.cur_track > 0:
                 self.cur_track -= 1
             else:
-                self.cur_track = self.cd.total_tracks_num
+                #self.cur_track = self.cd.total_tracks_num
+                pass
     def seek_pressed(self, direction): # this function should be run repeatedly for effect
         if self.state is Status.PAUSED:
             self.play_pause()
@@ -154,39 +164,18 @@ class CDPlayer():
                     self.state = Status.REWIND
                 new_pos = self.get_current_position() 
                 if new_pos < 0.99 and new_pos > 0.01: # stop seek when start or end of track reached
-                    new_pos += (k * 0.002 / self.cd.total_tracks_len[self.cur_track - 1]) # calculate time delta proportional to track length
+                    new_pos += (k * 0.002 / self.cd.total_tracks_len[self.cur_track]) # calculate time delta proportional to track length
                     self.player.set_position(new_pos)
                 self.state = Status.PLAYING
-    def stop(self, notification=True):
+    def stop(self):
         if self.state is not Status.NO_DISC and self.state is not Status.NO_DRIVE:
             self.listplayer.stop()
             self.cur_track = 0 # reset track count when stop playing
             self.state = Status.STOPPED
-            if notification: self.notify(Events.STOPPED) # do this unless eject (then separate event)
+            #if notification: self.notify(Events.STOPPED) # do this unless eject (then separate event)
     def eject(self):
-        if self.state is not Status.NO_DRIVE:
+        if self.state is not Status.NO_DRIVE and self.state is not Status.NO_DISC:
             self.stop()
             self.drive.eject_media()
             self.notify(Events.EJECT)
             self.state = Status.NO_DISC
-
-if __name__ == '__main__':
-    cd = CDPlayer()
-    while True:
-            res = input()
-            if res == 'p':
-                cd.play_pause()
-            elif res == 'n':
-                cd.next_track()
-            elif res == 'b':
-                cd.prev_track()
-            elif res == 'ff':
-                cd.seek_pressed(1)
-            elif res == 'rw':
-                cd.seek_pressed(-1)
-            elif res == 's':
-                cd.stop()
-            elif res == 'e':
-                cd.eject()
-            elif res == 'q':
-                sys.exit()
