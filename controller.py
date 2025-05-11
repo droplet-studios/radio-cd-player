@@ -6,6 +6,7 @@ from enum import Enum
 import datetime
 import time
 import sys
+import requests
 import threading
 
 class Mode(Enum):
