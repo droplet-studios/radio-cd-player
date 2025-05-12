@@ -17,59 +17,52 @@ class Mode(Enum):
 class Events(Enum):
     VOL = 0
 
-class Logger():
-    def log(self, event):
-        with open('log.txt', 'a') as logfile:
-            logfile.write(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {event}\n')
-
 class Controller():
     def __init__(self):
         self.cd_player = cd.CDPlayer()
         self.radio = radio.Radio()
         self.view = view.View(cd.Status, cd.Events, radio.Status, radio.Events)
 
-        self.logger = Logger()
-
         self.cd_player.attach(self)
         self.radio.attach(self)
 
         self.mode = Mode.OFF
 
-    def update(self, event):
+    def update(self, event, details=None):
+        if event is cd.Events.NO_DRIVE:
+            self.log('No disc drive found')
         if event is cd.Events.STOPPED:
             self.mode = Mode.OFF
             # stopped event doesn't need to be sent to view (because just changes mode to off)
         elif event is cd.Events.EJECT:
-            self.mode = Mode.OFF
             self.view.on_event(event) # send event to view
-        #self.logger.log()
+            self.mode = Mode.OFF
+        elif event is radio.Events.NO_DEFAULT:
+            self.log('Using default presets')
+        elif event is radio.Events.UNEX_STOP:
+            self.view.on_event(event) # send event to view
+            self.mode = Mode.OFF
+            self.log(f'Preset {details} stopped unexpectedly')
+        elif event is radio.Events.NET_LOST:
+            self.log('Network disconnected')
+        elif event is radio.Events.NO_PRESET:
+            self.view.on_event(event)
         
-    """
+    def log(self, event):
+        with open('log.txt', 'a') as logfile:
+            logfile.write(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {event}\n')
+
     # each function corresponds to physical button
     def start_radio(self): # switched mode to radio
         if self.mode != 'radio':
-            try:
-                self.cd.stop()
-            except:
-                print('No CD player instance to stop; continuing...')
-            try:
-                self.radio.start(self.radio_config.last_station)
-                self.mode = 'radio'
-            except PresetNotSet:
-                print('Preset not set')
-                self.special = 'Preset not set'
+            self.cd_player.stop()
+            self.radio.start()
 
     # how to generate functions without writing same thing?
     def preset_one(self):
         if self.radio.player.is_playing():
-            print('Setting preset to 1')
-            self.radio_config.set_last_station(0)
-            try:
-                self.radio.start(0)
-            except PresetNotSet:
-                print('Preset not set')
-                self.special = 'Preset not set'
-    """
+            self.radio.start(0)
+
     def play_pause(self): # switches mode to cd
         if self.mode is not Mode.CD:
             self.radio.stop()

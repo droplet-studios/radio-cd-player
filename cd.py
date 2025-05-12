@@ -18,6 +18,7 @@ class Status(Enum):
     REWIND = 5
 
 class Events(Enum):
+    NO_DRIVE = -1
     STOPPED = 0
     EJECT = 1
 
@@ -66,6 +67,7 @@ class CDPlayer():
             return True
         except:
             self.state = Status.NO_DRIVE
+            self.notify(Events.NO_DRIVE)
             return False
 
     def check_disc(self):

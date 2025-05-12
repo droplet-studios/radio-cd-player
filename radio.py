@@ -11,9 +11,10 @@ class Status(Enum):
     PLAYING = 1
 
 class Events(Enum):
+    NO_DEFAULT = -4
+    UNEX_STOP = -3
     NET_LOST = -2
     NO_PRESET = -1
-    STOPPED = 0
 
 class Preset():
     def __init__(self, url, name, num, selected):
@@ -29,7 +30,7 @@ class Radio():
         self.init_vlc()
         self.state = Status.STOPPED
 
-        threading.Thread(target=self.test_net).start() # start network checks in background
+        threading.Thread(target=self.status_check).start() # start network checks in background
 
         self.presets = [] # Preset objects
         self.vlc_presets = [] # VLC media objects
@@ -39,27 +40,33 @@ class Radio():
 
     def attach(self, observer):
         self.observers.append(observer)
-    def notify(self, event):
+    def notify(self, event, details=None):
+        print(event)
         for observer in self.observers:
-            observer.update(event)
+            observer.update(event, details)
 
-    def test_net(self): # does threading work?
+    def status_check(self): # does threading work?
         """
-        Network check runs as a continuous loop in background (because VLC doesn't)
+        Network and player status check runs as a continuous loop in background (because VLC doesn't)
         """
         while True:
+            # is player still playing?
+            if self.player.get_state() == 6 and self.state is Status.PLAYING: # when VLC status is not reflected in this program's state (6 is vlc code for 'Ended' state)
+                self.notify(Events.UNEX_STOP, self.last_station)
+                self.stop() # stop manually
+
+            # is network still connected?
             try:
                 requests.get('https://google.com/', timeout=5)
                 if self.state is not Status.PLAYING:
-                    self.state = Status.STOPPED
-                return True
+                    self.state = Status.STOPPED # reset to normal state if coming from no network connection
             except Exception as err:
-                print(err)
                 if self.state is not Status.NO_NET:
                     self.notify(Events.NET_LOST)
                 self.stop()
                 self.state = Status.NO_NET
-                return False
+
+            time.sleep(1)
 
     def init_vlc(self):
             self.instance = vlc.Instance()
@@ -69,6 +76,7 @@ class Radio():
         """
         Takes list of Preset objects and converts into list of VLC media object
         """
+        self.vlc_presets = [] # reset vlc preset list
         for item in self.presets:
             if item != None:
                 self.vlc_presets.append(self.instance.media_new(item.url))
@@ -79,12 +87,11 @@ class Radio():
                 with open('radio_saved_state.pkl', 'rb') as file:
                     self.presets = pickle.load(file)
                     self.last_station = pickle.load(file)
-                    #self.log('Successfully loaded previous configuration')
             except (EOFError, FileNotFoundError):
                 # set default values when no saved state
-                self.presets = [None for i in range(6)]
+                self.notify(Events.NO_DEFAULT)
+                self.presets = [None for i in range(5)] # five total presets
                 self.last_station = 0
-                #self.log('Could not load previous configuration, using defaults')
                 self.save_state()
             self.import_presets()
     def save_state(self):
@@ -114,23 +121,29 @@ class Radio():
         self.save_state()
     
     def start(self, preset=None):
-        if not preset: # when no preset specified, use last played
+        if not preset: # when no index specified on function call, use last played
             preset = self.last_station
-        if self.presets[preset] == None: # when preset not set
+        if self.presets[preset] == None: # when preset not saved at specified index
             self.notify(Events.NO_PRESET)
-        elif self.state is not Status.NO_NET: # when there is network connection
+        elif self.state is not Status.NO_NET: # when there is network connection, go ahead and play
             self.player.stop() # this allows to reset open stream and re-open (when necessary)
             self.set_last_station(preset)
             self.player.play()
             self.state = Status.PLAYING
+
+            # handle cases where VLC inexplicably hangs on opening stream
+            start = time.perf_counter()
+            while self.player.get_state() == 1: # when state is 'opening' (represented by 1)
+                if time.perf_counter() > start + 5: # wait 5 seconds of opening, then close stream
+                    self.stop()
+                    self.notify(Events.UNEX_STOP, self.last_station)
+
     def stop(self):
         self.player.stop()
         self.state = Status.STOPPED
 
 if __name__ == '__main__':
     radio = Radio()
-    #radio.set_preset('http://ice-1.streamhoster.com:80/lv_wqed--893', 'WQED', 0)
-    radio.start(3)
-    time.sleep(2)
+    radio.set_preset('http://ice-1.streamhoster.com:80/lv_wqed--893', 'WQED', 0)
     radio.start(0)
-    time.sleep(10)
+    time.sleep(20)
