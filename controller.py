@@ -1,12 +1,11 @@
 import cd
 import radio
+from radio import Preset # needs to be in namespace when presets are unpickled in radio module
 import view
 
 from enum import Enum
 import datetime
 import time
-import sys
-import requests
 import threading
 
 class Mode(Enum):
@@ -54,13 +53,14 @@ class Controller():
 
     # each function corresponds to physical button
     def start_radio(self): # switched mode to radio
-        if self.mode != 'radio':
+        if self.mode is not Mode.RADIO:
             self.cd_player.stop()
-            self.radio.start()
+            self.mode = Mode.RADIO
+        self.radio.start()
 
     # how to generate functions without writing same thing?
     def preset_one(self):
-        if self.radio.player.is_playing():
+        if self.mode is Mode.RADIO:
             self.radio.start(0)
 
     def play_pause(self): # switches mode to cd
@@ -115,7 +115,10 @@ class Controller():
                 else:
                     self.view.cd(state) # when no disc or no drive, then other variables don't exist because disc not initialised
             elif self.mode is Mode.RADIO:
-                pass
+                print(self.radio.player.get_state())
+                state = self.radio.state
+                station = self.radio.presets[self.radio.last_station].name
+                self.view.radio(state, station)
             time.sleep(1)
     def format_time(self, time): # move to controller?
         """
@@ -135,7 +138,11 @@ class Controller():
     def controls(self):
         while True:
             res = input()
-            if res == 'p':
+            if res == 'r':
+                controller.start_radio()
+            elif res == 'p1':
+                controller.preset_one()
+            elif res == 'p':
                 controller.play_pause()
             elif res == 'n':
                 controller.skip_forward()
