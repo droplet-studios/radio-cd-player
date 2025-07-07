@@ -1,8 +1,12 @@
 import datetime
 import time
+import serial
+import io
 
 class View():
     def __init__(self, cd_status, cd_event, radio_status, radio_event, cont_event):
+        self.display = serial.Serial('/dev/tty.usbmodem1201', 9600, timeout=1)
+
         self.cd_status = cd_status
         self.cd_event = cd_event
         self.radio_status = radio_status
@@ -71,8 +75,16 @@ class View():
                     line_2 = 'Cannot open'
                 elif self.event is self.cont_event.VOL:
                     line_2 = f'Volume {self.event_data}'
+                elif self.event is self.cont_event.CONFIG:
+                    line_2 = self.event_data
             else:
                 self.event = None
-        res = f'{line_1}\n{line_2}'
-        print(res)
-        return res
+
+        # calculate spaces after first line so line 2 starts on second line of display
+        space_count = 20 - len(line_1)
+        space_string = ' ' * space_count
+
+        self.display.write(b'\xfe\x58')
+        self.display.write(line_1.encode())
+        self.display.write(space_string.encode())
+        self.display.write(line_2.encode())

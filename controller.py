@@ -6,11 +6,11 @@ import view
 from enum import Enum
 import datetime
 import time
-import threading
 from gpiozero import Button
 import adafruit_tpa2016
 import busio
 import board
+import socket
 
 class Mode(Enum):
     OFF = 0
@@ -19,6 +19,7 @@ class Mode(Enum):
 
 class Events(Enum):
     VOL = 0
+    CONFIG = 1
 
 class Controller():
     def __init__(self):
@@ -41,14 +42,19 @@ class Controller():
         # initialise buttons
         pre_1 = Button(4)
         pre_1.when_activated = self.preset_1
+        pre_1.when_held = self.show_ip
         pre_2 = Button(17)
         pre_2.when_activated = self.preset_2
+        pre_2.when_held = self.show_ip
         pre_3 = Button(27)
         pre_3.when_activated = self.preset_3
+        pre_3.when_held = self.show_ip
         pre_4 = Button(22)
         pre_4.when_activated = self.preset_4
+        pre_4.when_held = self.show_ip
         pre_5 = Button(10)
         pre_5.when_activated = self.preset_5
+        pre_5._when_held = self.show_ip
         vol_dn = Button(9)
         vol_dn.when_activated = self.vol_down
         vol_dn.when_held = lambda: self.button_held(self.vol_down)
@@ -75,6 +81,9 @@ class Controller():
         eject.when_activated = self.eject
 
     def update(self, event, details=None):
+        """
+        This function deals with sending events to the view
+        """
         if event is cd.Events.NO_DRIVE:
             self.log('No disc drive found')
         if event is cd.Events.STOPPED:
@@ -94,6 +103,8 @@ class Controller():
         elif event is radio.Events.NO_PRESET:
             self.view.on_event(event)
         elif event is Events.VOL:
+            self.view.on_event(event, details)
+        elif event is Events.CONFIG:
             self.view.on_event(event, details)
         
     def log(self, event):
@@ -177,6 +188,14 @@ class Controller():
                 time.sleep(0.33)
     def button_released(self):
         self.held = False
+
+    def show_ip(self):
+        try:
+            hostname = socket.gethostname
+            ip = socket.gethostbyname(hostname)
+        except socket.error as error:
+            ip = None
+        self.update(Events.CONFIG, ip)
 
     def update_view(self):
         while True:
