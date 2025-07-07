@@ -2,19 +2,21 @@ import datetime
 import time
 
 class View():
-    def __init__(self, cd_status, cd_event, radio_status, radio_event):
+    def __init__(self, cd_status, cd_event, radio_status, radio_event, cont_event):
         self.cd_status = cd_status
         self.cd_event = cd_event
         self.radio_status = radio_status
         self.radio_event = radio_event
+        self.cont_event = cont_event # controller event
 
         self.event_start = 0
         self.event = None
         self.MAX_EVENT_LEN = 3
     
-    def on_event(self, event):
+    def on_event(self, event, data=None):
         self.event_start = time.perf_counter()
         self.event = event
+        self.event_data = data
 
     def off(self):
         line_1 = 'Off'
@@ -67,6 +69,8 @@ class View():
                     line_2 = 'No preset'
                 elif self.event is self.radio_event.NO_OPEN:
                     line_2 = 'Cannot open'
+                elif self.event is self.cont_event.VOL:
+                    line_2 = f'Volume {self.event_data}'
             else:
                 self.event = None
         res = f'{line_1}\n{line_2}'
