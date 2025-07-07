@@ -155,6 +155,10 @@ class Radio():
 
 if __name__ == '__main__':
     radio = Radio()
-    #radio.set_preset('http://ice-1.streamhoster.com:80/lv_wqed--893', 'WQED', 0)
-    radio.start()
-    time.sleep(20)
+
+    # run this to manually set presets (until I can make a web control interface)
+    radio.set_preset('https://ipm.streamguys1.com/wfiu1-mp3', 'WFIU 1', 0)
+    radio.set_preset('https://ipm.streamguys1.com/wfiu2-mp3', 'WFIU 2', 1)
+    radio.set_preset('https://audio.wgbh.org/classical-mp3', 'WCRB', 2)
+    radio.set_preset('http://ice-1.streamhoster.com:80/lv_wqed--893', 'WQED', 3)
+    radio.set_preset('https://ais-sa3.cdnstream1.com/2556_128.mp3?uuid=hx96mnyx', 'WESA', 4)
