@@ -7,9 +7,7 @@ from enum import Enum
 import datetime
 import time
 from gpiozero import Button
-import adafruit_tpa2016
-import busio
-import board
+import alsaaudio
 import socket
 
 class Mode(Enum):
@@ -32,10 +30,8 @@ class Controller():
 
         self.mode = Mode.OFF
 
-        i2c = busio.I2C(board.SCL, board.SDA)
-        self.tpa = adafruit_tpa2016.TPA2016(i2c)
-        self.volume = 15
-        self.tpa.fixed_gain = self.volume # set default volume
+        self.mixer = alsaaudio.Mixer('PCM')
+        self.mixer.setvolume(25)
 
         self.held = False # whether or not a button is being held
         
@@ -170,16 +166,14 @@ class Controller():
         self.cd_player.eject()
 
     def vol_down(self):
-        self.update(Events.VOL, self.volume)
-        if self.volume > 0:
-            self.volume -= 1
-            self.tpa.fixed_gain = self.volume
+        current = self.mixer.getvolume()
+        self.mixer.setvolume(current - 1)
+        self.update(Events.VOL, self.mixer.getvolume())
     def vol_up(self):
-        self.update(Events.VOL, self.volume)
-        if self.volume < 30:
-            self.volume += 1
-            self.tpa.fixed_gain = self.volume
-    
+        current = self.mixer.getvolume()
+        self.mixer.setvolume(current + 1)
+        self.update(Events.VOL, self.mixer.getvolume())
+
     def button_held(self, func):
         if not self.held: # is another button already being held down?
             self.held = True
