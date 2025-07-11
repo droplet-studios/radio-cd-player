@@ -46,13 +46,13 @@ class Controller():
         try:
             threading.Thread(target=self.update_view).start() # start updating lcd
         except:
-            logging.exception('Exception on LCD thread')
+            logging.exception(f'Exception on LCD thread at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
             raise
 
         try:
             threading.Thread(target=self.radio.status_check()).start() # start network checks in background
         except:
-            logging.exception('Exception on network checking thread')
+            logging.exception(f'Exception on network checking thread at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
             raise
         
         # initialise buttons
@@ -300,5 +300,5 @@ if __name__ == '__main__':
     try:
         controller = Controller()
     except:
-        logging.exception('Exception on main thread')
+        logging.exception('Exception on main thread at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         raise
