@@ -12,6 +12,7 @@ import socket
 import signal
 import threading
 import math
+import logging
 
 class Mode(Enum):
     OFF = 0
@@ -24,6 +25,10 @@ class Events(Enum):
 
 class Controller():
     def __init__(self):
+        INITIAL_VOL = 0.3
+        LOG_FILE = '/home/radio/radio_log.out'
+        logging.basicConfig(filename=LOG_FILE, level=logging.DEBUG)
+
         self.cd_player = cd.CDPlayer()
         self.radio = radio.Radio()
         self.view = view.View(cd.Status, cd.Events, radio.Status, radio.Events, Events)
@@ -33,13 +38,22 @@ class Controller():
 
         self.mode = Mode.OFF
 
-        INITIAL_VOL = 0.3
         self.volume = INITIAL_VOL
         self.set_vol()
 
         self.held = False # whether or not a button is being held
 
-        threading.Thread(target=self.update_view).start() # start updating lcd
+        try:
+            threading.Thread(target=self.update_view).start() # start updating lcd
+        except:
+            logging.exception('Exception on LCD thread')
+            raise
+
+        try:
+            threading.Thread(target=self.radio.status_check()).start() # start network checks in background
+        except:
+            logging.exception('Exception on network checking thread')
+            raise
         
         # initialise buttons
         pre_1 = Button(4)
@@ -112,8 +126,9 @@ class Controller():
             self.view.on_event(event, details)
         
     def log(self, event):
-        with open('log.txt', 'a') as logfile:
-            logfile.write(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {event}\n')
+        # with open('log.txt', 'a') as logfile:
+        #    logfile.write(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {event}\n')
+        logging.debug(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {event}\n')
 
     # each function corresponds to physical button
     def start_radio(self): # switched mode to radio
@@ -281,6 +296,9 @@ if __name__ == '__main__':
     for thread in threads:
         thread.start()
     """
-    controller = Controller()
-    while True:
-        controller.update_view()
+
+    try:
+        controller = Controller()
+    except:
+        logging.exception('Exception on main thread')
+        raise

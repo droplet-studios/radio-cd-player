@@ -33,8 +33,6 @@ class Radio():
         self.state = Status.STOPPED
         self.prev_state = Status.STOPPED # store previous state when state changes to no net
 
-        threading.Thread(target=self.status_check).start() # start network checks in background
-
         self.presets = [] # Preset objects
         self.vlc_presets = [] # VLC media objects
         self.last_station = 0
