@@ -7,8 +7,11 @@ from enum import Enum
 import datetime
 import time
 from gpiozero import Button
-import alsaaudio
+import pulsectl
 import socket
+import signal
+import threading
+import math
 
 class Mode(Enum):
     OFF = 0
@@ -30,10 +33,13 @@ class Controller():
 
         self.mode = Mode.OFF
 
-        self.mixer = alsaaudio.Mixer('PCM')
-        self.mixer.setvolume(25)
+        INITIAL_VOL = 0.3
+        self.volume = INITIAL_VOL
+        self.set_vol()
 
         self.held = False # whether or not a button is being held
+
+        threading.Thread(target=self.update_view).start() # start updating lcd
         
         # initialise buttons
         pre_1 = Button(4)
@@ -54,19 +60,19 @@ class Controller():
         vol_dn = Button(9)
         vol_dn.when_activated = self.vol_down
         vol_dn.when_held = lambda: self.button_held(self.vol_down)
-        vol_dn.when_deactivated = self.button_released(self.vol_down)
+        vol_dn.when_deactivated = self.button_released
         vol_up = Button(11)
         vol_up.when_activated = self.vol_up
         vol_up.when_held = lambda: self.button_held(self.vol_up)
-        vol_up.when_deactivated = lambda: self.button_released(self.vol_up)
+        vol_up.when_deactivated = self.button_released
         rw = Button(5)
         rw.when_activated = self.skip_backwards
         rw.when_held = lambda: self.button_held(self.rewind)
-        rw.when_deactivated = lambda: self.button_released(self.rewind)
+        rw.when_deactivated = self.button_released
         ff = Button(6)
         ff.when_activated = self.skip_forward
         ff.when_held = lambda: self.button_held(self.fast_forward)
-        ff.when_deactivated = lambda: self.button_released(self.fast_forward)
+        ff.when_deactivated = self.button_released
         radio_but = Button(13)
         radio_but.when_activated = self.start_radio
         off_but = Button(19)
@@ -75,6 +81,8 @@ class Controller():
         cd_but.when_activated = self.play_pause
         eject = Button(21)
         eject.when_activated = self.eject
+
+        signal.pause()
 
     def update(self, event, details=None):
         """
@@ -165,16 +173,26 @@ class Controller():
             self.mode = Mode.OFF
         self.cd_player.eject()
 
+    def set_vol(self):
+        print(self.volume)
+        print(math.ceil(self.volume * 20))
+        with pulsectl.Pulse('volume-setter') as pulse:
+            for sink in pulse.sink_list():
+                pulse.volume_set_all_chans(sink, self.volume)
+        self.update(Events.VOL, math.ceil(self.volume * 20))
+
     def vol_down(self):
-        current = self.mixer.getvolume()
-        self.mixer.setvolume(current - 1)
-        self.update(Events.VOL, self.mixer.getvolume())
+        if self.volume > 0:
+            self.volume -= 0.05
+            self.set_vol()
+
     def vol_up(self):
-        current = self.mixer.getvolume()
-        self.mixer.setvolume(current + 1)
-        self.update(Events.VOL, self.mixer.getvolume())
+        if self.volume < 1:
+            self.volume += 0.05
+            self.set_vol()
 
     def button_held(self, func):
+        print('held')
         if not self.held: # is another button already being held down?
             self.held = True
             while self.held:
@@ -208,7 +226,11 @@ class Controller():
             elif self.mode is Mode.RADIO:
                 print(self.radio.player.get_state())
                 state = self.radio.state
-                station = self.radio.presets[self.radio.last_station].name
+                if self.radio.presets[self.radio.last_station]:
+                    station = self.radio.presets[self.radio.last_station].name
+                else:
+                    station = None
+                
                 self.view.radio(state, station)
             time.sleep(1)
     def format_time(self, time): # move to controller?

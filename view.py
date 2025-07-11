@@ -5,7 +5,7 @@ import io
 
 class View():
     def __init__(self, cd_status, cd_event, radio_status, radio_event, cont_event):
-        self.display = serial.Serial('/dev/tty.usbmodem1201', 9600, timeout=1)
+        self.display = serial.Serial('/dev/LCD', 9600, timeout=1)
 
         self.cd_status = cd_status
         self.cd_event = cd_event
@@ -61,7 +61,10 @@ class View():
         elif state is self.radio_status.STOPPED:
             line_2 = ''
         else:
-            line_2 = station
+            if station is not None:
+                line_2 = station
+            else:
+                line_2 = ''
         self.make_final_view(line_1, line_2)
     
     def make_final_view(self, line_1, line_2):
@@ -71,8 +74,6 @@ class View():
                     line_2 = 'Disc ejected'
                 elif self.event is self.radio_event.NO_PRESET:
                     line_2 = 'No preset'
-                elif self.event is self.radio_event.NO_OPEN:
-                    line_2 = 'Cannot open'
                 elif self.event is self.cont_event.VOL:
                     line_2 = f'Volume {self.event_data}'
                 elif self.event is self.cont_event.CONFIG:

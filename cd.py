@@ -5,7 +5,7 @@ import re
 from enum import Enum
 import sys
 
-DRIVE_PATH = '/dev/sr1'
+DRIVE_PATH = '/dev/sr0'
 
 class Status(Enum):
     NO_DRIVE = -2
@@ -176,8 +176,8 @@ class CDPlayer():
             self.state = Status.STOPPED
             #if notification: self.notify(Events.STOPPED) # do this unless eject (then separate event)
     def eject(self):
-        if self.state is not Status.NO_DRIVE and self.state is not Status.NO_DISC:
+        if self.state is not Status.NO_DRIVE:
             self.stop()
-            self.drive.eject_media()
+            self.drive.eject_media_drive()
             self.notify(Events.EJECT)
             self.state = Status.NO_DISC

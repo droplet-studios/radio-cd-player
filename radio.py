@@ -41,6 +41,15 @@ class Radio():
 
         self.load_state()
 
+        self.set_preset('https://ipm.streamguys1.com/wfiu1-mp3', 'WFIU 1', 0)
+        self.set_preset('https://ipm.streamguys1.com/wfiu2-mp3', 'WFIU 2', 1)
+        self.set_preset('https://audio.wgbh.org/classical-mp3', 'WCRB', 2, True)
+        self.set_preset('http://ice-1.streamhoster.com:80/lv_wqed--893', 'WQED', 3)
+        self.set_preset('https://ais-sa3.cdnstream1.com/2556_128.mp3?uuid=hx96mnyx', 'WESA', 4)
+
+        for preset in self.presets:
+            print(f'{preset.url} {preset.name} {preset.num} {preset.selected}')
+
     def attach(self, observer):
         self.observers.append(observer)
     def notify(self, event, details=None):
@@ -113,7 +122,7 @@ class Radio():
             pickle.dump(self.presets, file)
             pickle.dump(self.last_station, file)
         #self.log('Saved configuration state')
-    def set_preset(self, url, name, num):
+    def set_preset(self, url, name, num, last_sel=False):
         """
         Adds new preset to list of presets and calls save_state() to save it
         """
@@ -132,8 +141,9 @@ class Radio():
         self.save_state()
     
     def start(self, preset=None):
-        if not preset: # when no index specified on function call, use last played
+        if preset == None: # when no index specified on function call, use last played
             preset = self.last_station
+            print('last st')
         if self.presets[preset] == None: # when preset not saved at specified index
             self.notify(Events.NO_PRESET)
         if self.state is not Status.NO_NET: # when there is network connection, go ahead and play
@@ -141,6 +151,7 @@ class Radio():
             self.set_last_station(preset)
             self.player.play()
             self.state = Status.PLAYING
+            print(f'radio start: {preset}')
 
             # handle cases where VLC inexplicably hangs on opening stream
             start = time.perf_counter()
@@ -159,6 +170,6 @@ if __name__ == '__main__':
     # run this to manually set presets (until I can make a web control interface)
     radio.set_preset('https://ipm.streamguys1.com/wfiu1-mp3', 'WFIU 1', 0)
     radio.set_preset('https://ipm.streamguys1.com/wfiu2-mp3', 'WFIU 2', 1)
-    radio.set_preset('https://audio.wgbh.org/classical-mp3', 'WCRB', 2)
+    radio.set_preset('https://audio.wgbh.org/classical-mp3', 'WCRB', 2, True)
     radio.set_preset('http://ice-1.streamhoster.com:80/lv_wqed--893', 'WQED', 3)
     radio.set_preset('https://ais-sa3.cdnstream1.com/2556_128.mp3?uuid=hx96mnyx', 'WESA', 4)
